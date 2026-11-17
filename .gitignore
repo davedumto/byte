@@ -22,3 +22,7 @@ brain/.stage/
 app/.theos/
 app/packages/
 app/Resources/world/
+
+# Python bytecode
+__pycache__/
+*.pyc
