@@ -62,12 +62,14 @@ The iPod sits on your home Wi-Fi with a jailbreak, so the design is defensive:
 
 ## Build and install
 
+Run each step from the repository root.
+
 ```sh
 # 1. The 3D world (also run automatically by the app build)
-cd byte-world && npm install && ./build.sh        # -> index.html; open it in a browser to play with it
+(cd byte-world && npm install && ./build.sh)      # -> index.html; open it in a browser to play with it
 
 # 2. The brain: llama.cpp b12444 for the A10, the launcher, and the .deb
-cd brain && ./build.sh && ./package.sh && ./test.sh
+(cd brain && ./build.sh && ./package.sh && ./test.sh)
 
 # 3. The model (676 MB), downloaded on your Mac and copied to the iPod
 curl -LO https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q8_0.gguf
@@ -76,7 +78,7 @@ shasum -a 256 qwen2.5-coder-0.5b-instruct-q8_0.gguf
 scp qwen2.5-coder-0.5b-instruct-q8_0.gguf mobile@<ipod>:/var/jb/var/mobile/byte/models/
 
 # 4. The app
-cd app && ./test.sh && make package && ./deploy.sh  # copies the .deb over and prints the sudo install command
+(cd app && ./test.sh && make package && ./deploy.sh)  # copies the .deb over and prints the sudo install command
 
 # 5. git shipit on the Mac (asks before changing anything)
 tools/mac/install.sh
