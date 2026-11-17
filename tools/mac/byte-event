@@ -1,0 +1,105 @@
+#!/bin/sh
+# byte-event: tell Byte on the iPod about your work (step 5, docs/TECHNICAL.md "Interfaces").
+#
+#   byte-event push [commits] [repo] [branch]   a push: Byte celebrates
+#   byte-event health                           is Byte there?
+#
+# Finds Byte by its Bonjour service ("Byte", _byte._tcp), falling back to the last address that worked.
+# Gives up within a few seconds and never asks for input. Exit: 0 delivered, 1 Byte not reachable or it
+# refused the request, 2 usage or token problem on this Mac.
+#
+# Settings (all optional): BYTE_TOKEN (else ~/.config/byte/events.token), BYTE_HOST (skip discovery),
+# BYTE_PORT (7420), BYTE_CONFIG_DIR (~/.config/byte), BYTE_SERVICE_NAME (Byte; tests only).
+set -u
+
+CONF="${BYTE_CONFIG_DIR:-$HOME/.config/byte}"
+TOKEN_FILE="$CONF/events.token"
+HOST_FILE="$CONF/host"          # last address that answered
+PORT="${BYTE_PORT:-7420}"
+LOOKUP_TENTHS=20                # Bonjour lookup budget: 2 s
+MAX_NAME=100
+
+say() { printf 'Byte: %s\n' "$*" >&2; }
+usage() { say "usage: byte-event push [commits] [repo] [branch] | byte-event health"; exit 2; }
+
+# Keeps names JSON-safe without a JSON tool: letters, digits and . _ / - only, at most MAX_NAME chars.
+clean_name() { printf '%s' "$1" | LC_ALL=C tr -c 'A-Za-z0-9._/-' '-' | cut -c "1-$MAX_NAME"; }
+
+is_token() { printf '%s' "$1" | LC_ALL=C grep -Eqx '[0-9a-f]{64}'; }
+
+read_token() {
+  if [ -n "${BYTE_TOKEN:-}" ]; then t="$BYTE_TOKEN"
+  elif [ -r "$TOKEN_FILE" ]; then t=$(LC_ALL=C tr -d ' \r\n' < "$TOKEN_FILE")
+  else say "no token at $TOKEN_FILE; run tools/mac/install.sh"; exit 2
+  fi
+  is_token "$t" || { say "the token at $TOKEN_FILE is malformed; run tools/mac/install.sh again"; exit 2; }
+  TOKEN="$t"
+}
+
+# Prints "host" of the Bonjour service, or nothing. dns-sd never exits on its own, so it is stopped.
+bonjour_host() {
+  out=$(mktemp "${TMPDIR:-/tmp}/byte-dns-sd.XXXXXX") || return 0
+  dns-sd -L "${BYTE_SERVICE_NAME:-Byte}" _byte._tcp local. > "$out" 2>/dev/null &
+  pid=$!
+  i=0
+  while [ $i -lt $LOOKUP_TENTHS ] && ! grep -q 'can be reached at' "$out"; do sleep 0.1; i=$((i + 1)); done
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+  # "... can be reached at Davids-iPod.local.:7420 (interface 14)"
+  sed -n 's/.* can be reached at \([^ ]*\):[0-9][0-9]* .*/\1/p' "$out" | head -n 1 | sed 's/\.$//'
+  rm -f "$out"
+}
+
+# send HOST METHOD PATH [JSON] -> prints the HTTP status ("000" if nothing answered).
+# The token goes to curl on stdin (-K -), so it never shows up in `ps`.
+send() {
+  url="http://$1:$PORT$3"; m="$2"; data="${4:-}"
+  if [ -n "$data" ]; then set -- --data-binary "$data"; else set --; fi
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl -s -K - -o /dev/null -w '%{http_code}' \
+    --connect-timeout 2 --max-time 3 -X "$m" -H 'Content-Type: application/json' "$@" "$url" 2>/dev/null || true
+}
+
+[ $# -ge 1 ] || usage
+case "$1" in
+  push)
+    [ $# -le 4 ] || usage
+    commits="${2:-0}"
+    printf '%s' "$commits" | grep -Eqx '[0-9]{1,6}' || commits=0
+    repo=$(clean_name "${3:-}"); branch=$(clean_name "${4:-}")
+    ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    method=POST; path=/event
+    body=$(printf '{"type":"push","repo":"%s","branch":"%s","commits":%d,"ts":"%s"}' "$repo" "$branch" "$commits" "$ts")
+    ;;
+  health) [ $# -eq 1 ] || usage; method=GET; path=/health; body="" ;;
+  *) usage ;;
+esac
+
+read_token
+
+# Candidate addresses, best first, without repeats.
+if [ -n "${BYTE_HOST:-}" ]; then
+  candidates="$BYTE_HOST"
+else
+  found=$(bonjour_host)
+  cached=$(cat "$HOST_FILE" 2>/dev/null | head -n 1)
+  candidates="$found"
+  [ -n "$cached" ] && [ "$cached" != "$found" ] && candidates="$candidates $cached"
+fi
+[ -n "$(printf '%s' "$candidates" | tr -d ' ')" ] || { say "couldn't find Byte on the network (is the app open on the iPod?)"; exit 1; }
+
+for host in $candidates; do
+  code=$(send "$host" "$method" "$path" "$body")
+  case "$code" in
+    200|202)
+      if [ -z "${BYTE_HOST:-}" ]; then
+        (umask 077; mkdir -p "$CONF" && printf '%s\n' "$host" > "$HOST_FILE") 2>/dev/null
+      fi
+      [ "$1" = push ] && say "celebrating your push." || say "here, at $host."
+      exit 0 ;;
+    401) say "the iPod refused the token; run tools/mac/install.sh again"; exit 1 ;;
+    503) say "the iPod has no events token yet (install brain 0.1.6 or later)"; exit 1 ;;
+    000) ;;  # nothing answered at this address: try the next one
+    *) say "unexpected reply $code from $host"; exit 1 ;;
+  esac
+done
+say "couldn't reach Byte (is the app open on the iPod?)"
+exit 1

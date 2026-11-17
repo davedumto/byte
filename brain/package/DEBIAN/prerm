@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stop the brain daemon before the package is removed or upgraded. The model file is left in place.
+launchctl unload /var/jb/Library/LaunchDaemons/app.byte.brain.plist 2>/dev/null || true
+exit 0

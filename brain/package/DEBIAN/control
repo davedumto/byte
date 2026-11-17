@@ -1,0 +1,9 @@
+Package: app.byte.brain
+Name: Byte Brain
+Version: 0.1.6
+Architecture: iphoneos-arm64
+Description: llama.cpp llama-server (b12444, CPU only) for Byte, on 127.0.0.1:8080, running Qwen2.5-Coder 0.5B Q8_0. Model installed separately.
+Maintainer: Byte
+Author: Byte
+Section: Utilities
+Depends: firmware (>= 15.0)

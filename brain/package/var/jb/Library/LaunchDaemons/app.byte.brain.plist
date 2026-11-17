@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>app.byte.brain</string>
+
+	<!-- Byte's brain: llama-server, localhost only. iOS 15 caps launch daemons at 6 MB, so launchd starts
+	     byte-brain-launcher (as root), which lifts that cap for itself, drops to mobile and execs llama-server. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/var/jb/usr/libexec/byte/byte-brain-launcher</string>
+		<string>/var/jb/usr/libexec/byte/llama-server</string>
+		<string>--model</string>
+		<string>/var/jb/var/mobile/byte/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf</string>
+		<string>--host</string>
+		<string>127.0.0.1</string>
+		<string>--port</string>
+		<string>8080</string>
+		<string>--ctx-size</string>
+		<string>1024</string>
+		<string>--n-predict</string>
+		<string>80</string>
+		<string>--threads</string>
+		<string>2</string>
+		<string>--parallel</string>
+		<string>1</string>
+		<string>--cache-ram</string>
+		<string>0</string>
+		<string>--sleep-idle-seconds</string>
+		<string>600</string>
+		<string>--no-webui</string>
+		<string>--log-verbosity</string>
+		<string>2</string>
+	</array>
+
+	<!-- No UserName: the launcher needs root for one call, then permanently drops to mobile before llama-server runs. -->
+
+	<!-- Run (and restart after a crash) only while the model file exists, so a missing model can't crash-loop. -->
+	<key>KeepAlive</key>
+	<dict>
+		<key>PathState</key>
+		<dict>
+			<key>/var/jb/var/mobile/byte/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf</key>
+			<true/>
+		</dict>
+	</dict>
+	<!-- launchd defaults daemons to "adaptive", which iOS runs at background priority (4): answers took >120 s.
+	     Interactive = normal CPU priority. Pressured exit and transactions are off so launchd never kills the
+	     brain as "idle" (it frees its own memory with sleep-idle-seconds instead). -->
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>EnablePressuredExit</key>
+	<false/>
+	<key>EnableTransactions</key>
+	<false/>
+
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+
+	<key>StandardOutPath</key>
+	<string>/var/jb/var/mobile/byte/brain.log</string>
+	<key>StandardErrorPath</key>
+	<string>/var/jb/var/mobile/byte/brain.log</string>
+</dict>
+</plist>

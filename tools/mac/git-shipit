@@ -1,0 +1,26 @@
+#!/bin/sh
+# git shipit [git push arguments]: runs git push, and if it succeeds and sent new commits, tells Byte
+# (step 5, decision 4A). Installed as a git alias by tools/mac/install.sh.
+#
+# The push itself is untouched: same output, same exit code. Byte can only add one line afterwards,
+# and an unreachable Byte never fails or slows the push by more than a few seconds.
+# "New commits" = commits the remote-tracking branches have after the push that they didn't before,
+# so it works for any branch you push. Pushing only tags, or to a bare URL, doesn't celebrate.
+set -u
+HERE=$(cd "$(dirname "$0")" && pwd)
+NOTIFY="${BYTE_EVENT:-$HERE/byte-event}"
+
+before=$(git for-each-ref --format='%(objectname)' refs/remotes 2>/dev/null | sort -u)
+
+git push "$@"
+status=$?
+[ "$status" -eq 0 ] || exit "$status"
+
+# shellcheck disable=SC2086 # $before is a list of object names
+commits=$(git rev-list --count --remotes --not $before 2>/dev/null || echo 0)
+[ "$commits" -gt 0 ] 2>/dev/null || exit 0
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) && repo=$(basename "$top") || repo=""
+branch=$(git symbolic-ref --short -q HEAD 2>/dev/null || echo detached)
+"$NOTIFY" push "$commits" "$repo" "$branch" || true
+exit 0

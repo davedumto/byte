@@ -1,0 +1,10 @@
+#!/bin/sh
+# Load (or reload) the brain daemon. It only starts running once the model file exists.
+PLIST=/var/jb/Library/LaunchDaemons/app.byte.brain.plist
+mkdir -p /var/jb/var/mobile/byte/models
+chown mobile:mobile /var/jb/var/mobile/byte /var/jb/var/mobile/byte/models
+chown root:wheel "$PLIST"
+chmod 644 "$PLIST"
+launchctl unload "$PLIST" 2>/dev/null || true
+launchctl load -w "$PLIST"
+exit 0

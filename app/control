@@ -1,0 +1,9 @@
+Package: app.byte.pet
+Name: Byte
+Version: 0.1.0
+Architecture: iphoneos-arm64
+Description: Offline AI desk pet: a small robot in a 3D room.
+Maintainer: Byte
+Author: Byte
+Section: Utilities
+Depends: firmware (>= 15.0)

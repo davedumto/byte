@@ -1,0 +1,24 @@
+.DS_Store
+
+# Downloaded or rebuilt, never committed
+node_modules/
+*.gguf
+*.deb
+
+# byte-world: build.sh turns main.js + page.html into these
+byte-world/bundle.js
+byte-world/index.html
+
+# brain: llama.cpp is cloned at a pinned tag by build.sh; models are downloaded (see README)
+brain/llama.cpp/
+brain/build-ios/
+brain/build-mac/
+brain/out/
+brain/packages/
+brain/models/
+brain/.stage/
+
+# app: Theos output and the world copied in at build time
+app/.theos/
+app/packages/
+app/Resources/world/

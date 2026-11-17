@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Write the log and (later) state.json under /var/jb/var/mobile/byte, outside an app container. -->
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	<key>platform-application</key>
+	<true/>
+	<!-- Dev builds: lets Safari's Web Inspector on the Mac attach to the world over the cable. -->
+	<key>get-task-allow</key>
+	<true/>
+</dict>
+</plist>
