@@ -2,6 +2,7 @@
 # byte-event: tell Byte on the iPod about your work (step 5, docs/TECHNICAL.md "Interfaces").
 #
 #   byte-event push [commits] [repo] [branch]   a push: Byte celebrates
+#   byte-event commit                           a commit: Byte turns Focused (sent by git-commit-hook)
 #   byte-event health                           is Byte there?
 #
 # Finds Byte by its Bonjour service ("Byte", _byte._tcp), falling back to the last address that worked.
@@ -20,7 +21,7 @@ LOOKUP_TENTHS=20                # Bonjour lookup budget: 2 s
 MAX_NAME=100
 
 say() { printf 'Byte: %s\n' "$*" >&2; }
-usage() { say "usage: byte-event push [commits] [repo] [branch] | byte-event health"; exit 2; }
+usage() { say "usage: byte-event push [commits] [repo] [branch] | byte-event commit | byte-event health"; exit 2; }
 
 # Keeps names JSON-safe without a JSON tool: letters, digits and . _ / - only, at most MAX_NAME chars.
 clean_name() { printf '%s' "$1" | LC_ALL=C tr -c 'A-Za-z0-9._/-' '-' | cut -c "1-$MAX_NAME"; }
@@ -69,6 +70,11 @@ case "$1" in
     method=POST; path=/event
     body=$(printf '{"type":"push","repo":"%s","branch":"%s","commits":%d,"ts":"%s"}' "$repo" "$branch" "$commits" "$ts")
     ;;
+  commit)
+    [ $# -eq 1 ] || usage
+    method=POST; path=/event
+    body=$(printf '{"type":"commit","ts":"%s"}' "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+    ;;
   health) [ $# -eq 1 ] || usage; method=GET; path=/health; body="" ;;
   *) usage ;;
 esac
@@ -93,7 +99,11 @@ for host in $candidates; do
       if [ -z "${BYTE_HOST:-}" ]; then
         (umask 077; mkdir -p "$CONF" && printf '%s\n' "$host" > "$HOST_FILE") 2>/dev/null
       fi
-      [ "$1" = push ] && say "celebrating your push." || say "here, at $host."
+      case "$1" in
+        push) say "celebrating your push." ;;
+        commit) ;;  # runs after every commit: stay quiet
+        *) say "here, at $host." ;;
+      esac
       exit 0 ;;
     401) say "the iPod refused the token; run tools/mac/install.sh again"; exit 1 ;;
     503) say "the iPod has no events token yet (install brain 0.1.6 or later)"; exit 1 ;;

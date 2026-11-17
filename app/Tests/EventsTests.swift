@@ -31,14 +31,17 @@ func runEventsTests() {
     eq(EventSchema.logText(.event(.push(commits: 3))), "push, 3 commits", "log text plural")
     check(!EventSchema.logText(.event(.push(commits: 3))).contains("vellar"), "log text never has the repo")
 
-    // MARK: Reactor: push celebrates, at most once per gap; other events do nothing yet
+    // MARK: Reactor: push celebrates (at most once per gap), commit focuses, the rest do nothing yet
     do {
         let r = EventReactor(), t0 = Date(timeIntervalSince1970: 1_000_000)
         eq(r.react(to: .push(commits: 1), now: t0), .celebrate, "push celebrates")
         eq(r.react(to: .push(commits: 1), now: t0.addingTimeInterval(3)), nil, "second push within the gap is dropped")
+        eq(r.react(to: .commit, now: t0.addingTimeInterval(3)), nil, "a commit right after a push doesn't cut the party short")
         eq(r.react(to: .push(commits: 1), now: t0.addingTimeInterval(EventReactor.minCelebrationGap)), .celebrate, "push after the gap celebrates")
+        eq(r.react(to: .commit, now: t0.addingTimeInterval(EventReactor.minCelebrationGap * 2)), .mood(.focused), "commit after the party focuses")
         eq(r.react(to: .push(commits: 1), now: t0), .celebrate, "clock going backwards never blocks forever")
-        for e in [WorkEvent.commit, .testPass, .testFail, .breakTaken] {
+        eq(EventReactor().react(to: .commit), .mood(.focused), "commit -> focused")
+        for e in [WorkEvent.testPass, .testFail, .breakTaken] {
             eq(EventReactor().react(to: e), nil, "\(e) has no effect in v1")
         }
     }

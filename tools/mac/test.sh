@@ -36,6 +36,10 @@ check '[ "$(field body repo | wc -c)" -le 101 ]' "repo name capped at 100 chars"
 ./byte-event push 2>/dev/null
 check '[ "$(field body commits)" = 0 ] && [ "$(field body repo)" = "" ]' "push with no details"
 
+out=$(./byte-event commit 2>&1); code=$?
+check '[ $code -eq 0 ] && [ -z "$out" ]' "commit exits 0 and prints nothing"
+check '[ "$(field body type)" = commit ] && field body ts | grep -Eqx "[0-9T:Z-]{20}"' "commit body"
+./byte-event commit extra 2>/dev/null; check '[ $? -eq 2 ]' "commit takes no arguments"
 ./byte-event health 2>/dev/null; check '[ $? -eq 0 ] && [ "$(field method "")" = GET ] && [ "$(field path "")" = /health ]' "health"
 
 out=$(BYTE_TOKEN=$(printf 'ab%.0s' $(seq 32)) ./byte-event push 1 r b 2>&1); code=$?
@@ -108,6 +112,25 @@ git tag v1; "$HERE/git-shipit" -q origin v1
 check '[ ! -s "$CALLS" ]' "tag-only push: no celebration"
 printf '#!/bin/sh\nexit 1\n' > "$STUB"
 "$HERE/git-shipit" -q; check '[ $? -eq 0 ]' "unreachable Byte never fails the push"
+
+# --- commit hook: config-based, runs alongside the repo's own hook, never slows or fails a commit ---
+printf '#!/bin/sh\nsleep 3; echo commit >> "%s"\n' "$CALLS" > "$STUB"
+printf '#!/bin/sh\necho own-hook-ran >> "%s"\n' "$T/own" > .git/hooks/post-commit; chmod +x .git/hooks/post-commit
+git config --global hook.byte.event post-commit
+git config --global hook.byte.command "\"$HERE/git-commit-hook\""
+: > "$CALLS"
+start=$(date +%s); out=$(git commit -q --allow-empty -m hooked 2>&1); code=$?
+check '[ $code -eq 0 ] && [ -z "$out" ]' "commit with the hook: succeeds, prints nothing"
+check '[ $(( $(date +%s) - start )) -le 1 ]' "commit doesn't wait for Byte (notifier runs in the background)"
+check '[ "$(cat "$T/own")" = own-hook-ran ]' "the repo's own post-commit hook still runs"
+i=0; while [ ! -s "$CALLS" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+check '[ "$(cat "$CALLS")" = commit ]' "the hook sent a commit event"
+: > "$CALLS"; git config hook.byte.enabled false; git commit -q --allow-empty -m off; sleep 3.5
+check '[ ! -s "$CALLS" ]' "hook.byte.enabled false turns it off for one repo"
+git config --unset hook.byte.enabled
+printf '#!/bin/sh\nexit 1\n' > "$STUB"
+git commit -q --allow-empty -m failing-notifier; check '[ $? -eq 0 ]' "a failing notifier never fails the commit"
+git config --global --remove-section hook.byte
 cd "$HERE"
 
 # --- install.sh: answering no changes nothing ---

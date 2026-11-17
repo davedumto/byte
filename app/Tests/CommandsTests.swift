@@ -35,6 +35,19 @@ func runCommandsTests() {
     for s in ["celebrate", "party", "dance", "party time", "celebrate!"] { eq(m(s), .action(.celebrate), "'\(s)' -> celebrate") }
     for s in ["go to sleep", "go to bed", "sleep", "take a nap", "nap", "bedtime"] { eq(m(s), .action(.sleep), "'\(s)' -> sleep") }
     for s in ["wake up", "get up", "rise and shine"] { eq(m(s), .action(.wakeUp), "'\(s)' -> wake up") }
+    let moodPhrases: [(String, Mood)] = [
+        ("focus", .focused), ("focus mode", .focused), ("Get to work!", .focused), ("lets focus", .focused), ("lock in", .focused),
+        ("be bored", .bored), ("look bored", .bored), ("night owl", .night), ("Night owl mode", .night),
+        ("hey byte, go night owl please", .night), ("cheer up", .happy), ("be happy", .happy), ("smile", .happy)
+    ]
+    for (s, mood) in moodPhrases { eq(m(s), .action(.mood(mood)), "'\(s)' -> \(mood)") }
+    for s in ["how do I focus an input in javascript", "why am I bored", "what is a night owl", "is happy a git command",
+              "focus on the error", "smile emoji code"] {
+        eq(m(s), nil, "'\(s)' is a question, not a mood command")
+    }
+    for mood in [Mood.focused, .bored, .night, .happy] {
+        check(!CommandMatcher.reply(.action(.mood(mood))).isEmpty, "reply for mood \(mood)")
+    }
     eq(m("go to bed"), .action(.sleep), "'go to bed' sleeps, while...")
     eq(m("go to the bed"), go(.beanBag), "...'go to the bed' only walks to the bean bag")
 
@@ -46,7 +59,7 @@ func runCommandsTests() {
     // MARK: Questions and chat must reach the brain
     for s in ["how do I jump to a git tag?", "what does git celebrate do", "how do I make my code sleep for a second",
               "jump to line 5 in vim", "where is the desk?", "can you go to the plant and tell me a joke about it ok",
-              "get to work", "come to the plant", "go", "go to", "go to the", "please", "", "   ", "?!",
+              "come to the plant", "go", "go to", "go to the", "please", "", "   ", "?!",
               "what is a bean bag", "is the plant real", "how do I go to the next line in python",
               "I want to celebrate my release, what should I do"] {
         eq(m(s), nil, "'\(s)' is not a command")
@@ -127,6 +140,21 @@ func runCommandsTests() {
         turns.handle(.ask(text: "wake up")); clock.fire()
         eq(out().last, "window.byte.setMood(\"happy\")", "wake up -> happy mood")
         turns.handle(.ask(text: "q")); eq(brain.calls.last?.mood, .happy, "brain hears the new mood")
+        turns.handle(.ask(text: "night owl mode")); clock.fire()
+        eq(out().last, "window.byte.setMood(\"night\")", "mood command -> setMood")
+        turns.handle(.ask(text: "q2")); eq(brain.calls.last?.mood, .night, "brain hears the commanded mood")
+    }
+    do { // setMood (also used by commit events): changes once, repeats are no-ops
+        let (turns, _, _, out) = make()
+        turns.setMood(.focused)
+        eq(out(), ["window.byte.setMood(\"focused\")"], "setMood sends once")
+        turns.setMood(.focused)
+        eq(out().count, 1, "same mood again sends nothing (no walking back and forth)")
+        eq(turns.mood, .focused, "controller mood updated")
+        turns.handle(.ask(text: "go to sleep")); turns.handle(.askClosed)
+        eq(turns.mood, .sleepy, "a command still changes it")
+        turns.setMood(.focused)
+        eq(out().last, "window.byte.setMood(\"focused\")", "a commit wakes Byte into Focused")
     }
     do { // unknown place: reply only, bubble stays open, nothing scheduled
         let (turns, brain, clock, out) = make()

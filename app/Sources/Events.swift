@@ -37,7 +37,7 @@ enum EventSchema {
     static func logText(_ parsed: ParsedEvent) -> String {
         switch parsed {
         case .event(.push(let commits)): return "push, \(commits) commit\(commits == 1 ? "" : "s")"
-        case .event(.commit): return "commit (no effect until the v2 mood engine)"
+        case .event(.commit): return "commit"
         case .event(.testPass): return "test_pass (no effect until the v2 mood engine)"
         case .event(.testFail): return "test_fail (no effect until the v2 mood engine)"
         case .event(.breakTaken): return "break (no effect until the v2 mood engine)"
@@ -65,19 +65,37 @@ enum EventSchema {
     }
 }
 
-/// Turns events into world commands. A flood of pushes (or a stuck script) gives at most one
-/// celebration per `minCelebrationGap`; the world's own celebration lasts 10 s.
+/// What an event makes Byte do.
+enum Reaction: Equatable {
+    case celebrate
+    case mood(Mood)
+}
+
+/// Turns events into reactions. A push celebrates, at most once per `minCelebrationGap` (a flood of pushes
+/// or a stuck script gives one party; the world's own celebration lasts 10 s). A commit means you're working,
+/// so Byte turns Focused (decision 2026-11-17, 2A), except right after a push, so the commit hook never cuts
+/// a celebration short. test_pass, test_fail and break do nothing until the v2 mood engine.
 final class EventReactor {
     static let minCelebrationGap: TimeInterval = 10
     private var lastCelebration: Date?
 
-    func react(to event: WorkEvent, now: Date = Date()) -> WorldCommand? {
-        guard case .push = event else { return nil } // the rest feed the v2 mood engine
-        if let last = lastCelebration, now.timeIntervalSince(last) < EventReactor.minCelebrationGap, now >= last {
+    func react(to event: WorkEvent, now: Date = Date()) -> Reaction? {
+        switch event {
+        case .push:
+            if let last = lastCelebration, celebratedRecently(last, now) { return nil }
+            lastCelebration = now
+            return .celebrate
+        case .commit:
+            if let last = lastCelebration, celebratedRecently(last, now) { return nil }
+            return .mood(.focused)
+        case .testPass, .testFail, .breakTaken:
             return nil
         }
-        lastCelebration = now
-        return .celebrate
+    }
+
+    /// A clock that jumps backwards never blocks reactions forever.
+    private func celebratedRecently(_ last: Date, _ now: Date) -> Bool {
+        now >= last && now.timeIntervalSince(last) < EventReactor.minCelebrationGap
     }
 }
 

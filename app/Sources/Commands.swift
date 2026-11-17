@@ -35,8 +35,9 @@ enum WorldAction: Equatable {
     case goTo(Place)
     case jump
     case celebrate
-    case sleep     // mood sleepy: walks to the bean bag and lies down
-    case wakeUp    // mood happy
+    case sleep         // mood sleepy: walks to the bean bag and lies down
+    case wakeUp        // mood happy
+    case mood(Mood)    // "focus mode", "be bored", "night owl mode", "cheer up" (decision 2026-11-17, 1B)
 }
 
 enum CommandMatch: Equatable {
@@ -66,10 +67,22 @@ enum CommandMatcher {
         case .action(.celebrate): return "Party time!"
         case .action(.sleep): return "Okay, nap time."
         case .action(.wakeUp): return "I'm up, I'm up!"
+        case .action(.mood(let mood)): return moodReply(mood)
         case .unknownPlace(let name):
             let list = Place.allCases.map { $0.spokenName }
             return "There's no \(name) in my room. I can go to the " +
                 list.dropLast().joined(separator: ", ") + " or " + list.last! + "."
+        }
+    }
+
+    private static func moodReply(_ mood: Mood) -> String {
+        switch mood {
+        case .focused: return "Focus mode on."
+        case .bored: return "Ugh, so bored."
+        case .night: return "Night owl mode!"
+        case .happy: return "Yay, happy again!"
+        case .sleepy: return "Okay, nap time."
+        case .celebrating: return "Party time!"
         }
     }
 
@@ -84,6 +97,11 @@ enum CommandMatcher {
         for s in ["sleep", "go to sleep", "go to bed", "go sleep", "nap", "take a nap", "have a nap", "go nap",
                   "go take a nap", "go have a nap", "bedtime", "time for bed", "time to sleep"] { p[s] = .sleep }
         for s in ["wake up", "get up", "wake", "rise and shine", "wakey wakey"] { p[s] = .wakeUp }
+        for s in ["focus", "be focused", "get focused", "focus mode", "lets focus", "lets get focused", "work mode",
+                  "get to work", "lets work", "time to work", "lock in"] { p[s] = .mood(.focused) }
+        for s in ["be bored", "look bored", "act bored", "bored mode", "get bored"] { p[s] = .mood(.bored) }
+        for s in ["night owl", "night owl mode", "be a night owl", "go night owl", "owl mode", "night mode"] { p[s] = .mood(.night) }
+        for s in ["be happy", "cheer up", "smile", "happy mode", "get happy", "be cheerful"] { p[s] = .mood(.happy) }
         return p
     }()
 

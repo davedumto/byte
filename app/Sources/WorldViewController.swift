@@ -103,8 +103,11 @@ final class WorldViewController: UIViewController {
 
     private func handle(_ parsed: ParsedEvent) {
         Log.info("event: \(EventSchema.logText(parsed))") // type and count only, never repo or branch names
-        guard case .event(let event) = parsed, let command = reactor.react(to: event) else { return }
-        bridge.send(command)
+        guard case .event(let event) = parsed, let reaction = reactor.react(to: event) else { return }
+        switch reaction {
+        case .celebrate: bridge.send(.celebrate)
+        case .mood(let mood): turns.setMood(mood) // through the controller, so the brain hears the new mood
+        }
     }
 
     // MARK: - Screen

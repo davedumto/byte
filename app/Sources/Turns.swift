@@ -140,9 +140,18 @@ final class TurnController {
         case .goTo(let place): bridge.send(.goTo(place))
         case .jump: bridge.send(.jump)
         case .celebrate: bridge.send(.celebrate)
-        case .sleep: mood = .sleepy; bridge.send(.setMood(.sleepy))
-        case .wakeUp: mood = .happy; bridge.send(.setMood(.happy))
+        case .sleep: setMood(.sleepy)
+        case .wakeUp: setMood(.happy)
+        case .mood(let m): setMood(m)
         }
+    }
+
+    /// Changes the mood the world shows and the brain hears. The same mood again does nothing, so repeated
+    /// commit events don't keep walking Byte back to its spot.
+    func setMood(_ m: Mood) {
+        guard m != mood else { return }
+        mood = m
+        bridge.send(.setMood(m))
     }
 
     /// Only finished answers are kept: a failed or cut-off answer would mislead the next one.

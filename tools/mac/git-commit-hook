@@ -1,0 +1,9 @@
+#!/bin/sh
+# Runs after every `git commit` (a global config-based hook, set up by tools/mac/install.sh; decision
+# 2026-11-17, 2A): tells Byte you're working, so it turns Focused. It hands off to byte-event in the
+# background and returns at once, so commits never wait on the network, and it never prints anything.
+# Git runs it alongside each repo's own hooks (husky, core.hooksPath and .git/hooks keep working).
+# Off for one repo:  git config hook.byte.enabled false
+HERE=$(cd "$(dirname "$0")" && pwd)
+"${BYTE_EVENT:-$HERE/byte-event}" commit >/dev/null 2>&1 </dev/null &
+exit 0

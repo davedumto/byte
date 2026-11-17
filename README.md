@@ -21,6 +21,7 @@ Byte is a small robot in a cozy 3D room, running full screen on a jailbroken iPo
 - **A living room.** Byte wanders a hand-built 3D room (desk, bean bag, plant, window, bookshelf, mailbox, rug) with moods: Happy, Focused, Sleepy, Bored, Night owl and Celebrating.
 - **Ask Byte.** Tap *Ask Byte*, type a question, and the answer streams into the speech bubble. The first word appears in about **0.3–0.5 s** and the rest at about **27 tokens/s**, all on the iPod's A10.
 - **Follow-up questions.** While the bubble is open Byte remembers the last two exchanges, so "and how do I undo that?" works. Nothing is saved to disk.
+- **Moods you can set.** "focus mode", "be bored", "night owl mode", "cheer up", "go to sleep" and "wake up" change how Byte looks and how it talks. A `git commit` makes Byte Focused.
 - **Typed commands.** "go to the plant", "go to bed", "jump", "celebrate", "wake up" and friends are matched before the model is asked, so they're instant and always work. Questions like *"how do I jump to a git tag?"* still go to the brain.
 - **`git shipit`.** A git alias that runs `git push` and, if new commits went out, tells Byte, which celebrates for 10 s with the mailbox flag up.
 - **Stays smooth while thinking.** The world drops to 15 fps while the model is generating (the A10 has two fast cores), then returns to 60 fps.
@@ -32,7 +33,7 @@ Byte is a small robot in a cozy 3D room, running full screen on a jailbroken iPo
 | 3D world | [`byte-world/`](byte-world) | three.js scene in `main.js`, bundled by esbuild and inlined into one `index.html`. Exposes a small `window.byte` API. |
 | App shell | [`app/`](app) | Theos Swift app: hosts the world in a WKWebView, runs question turns and typed commands, talks to the brain, listens for push events, shows the About/credits sheet. |
 | Brain | [`brain/`](brain) | llama.cpp's `llama-server` cross-compiled for the A10 (CPU/NEON, static), plus a tiny root launcher, shipped as a rootless `.deb` with a launchd daemon on `127.0.0.1:8080`. |
-| Mac side | [`tools/mac/`](tools/mac) | `byte-event` (sends events), `git-shipit` (the alias) and `install.sh`. |
+| Mac side | [`tools/mac/`](tools/mac) | `byte-event` (sends events), `git-shipit` (the alias), `git-commit-hook` and `install.sh`. |
 | Spec | [`docs/TECHNICAL.md`](docs/TECHNICAL.md) | The full design spec (text copy of the PDF in the root). |
 | Build log | [`BUILD_LOG.md`](BUILD_LOG.md) | Every decision, measurement and dead end, in order. Start here to see *why* things are the way they are. |
 
@@ -80,7 +81,7 @@ scp qwen2.5-coder-0.5b-instruct-q8_0.gguf mobile@<ipod>:/var/jb/var/mobile/byte/
 # 4. The app
 (cd app && ./test.sh && make package && ./deploy.sh)  # copies the .deb over and prints the sudo install command
 
-# 5. git shipit on the Mac (asks before changing anything)
+# 5. git shipit and the commit hook on the Mac (asks before changing anything)
 tools/mac/install.sh
 ```
 
@@ -100,7 +101,9 @@ tools/mac/test.sh    # shell: byte-event vs a fake Byte, Bonjour discovery, git-
 ## Using it
 
 - **Ask:** tap *Ask Byte*, type, send. Closing the bubble ends the conversation.
-- **Commands:** `go to the desk | bean bag | bed | plant | window | bookshelf | mailbox | rug`, `jump`, `celebrate`, `dance`, `go to sleep`, `wake up`.
+- **Commands:** `go to the desk | bean bag | bed | plant | window | bookshelf | mailbox | rug`, `jump`, `celebrate`, `dance`.
+- **Moods:** `focus mode` / `get to work`, `be bored`, `night owl mode`, `cheer up`, `go to sleep`, `wake up`. Moods stay until something changes them.
+- **Commit:** every `git commit` makes Byte Focused. It's a global config-based hook that runs alongside your repos' own hooks and never slows a commit. Turn it off for one repo with `git config hook.byte.enabled false`.
 - **Push:** `git shipit` (any `git push` arguments work). Pushing only tags, a dry run or a failed push doesn't celebrate.
 - **Credits:** long-press the mood chip.
 - **Check from the Mac:** `tools/mac/byte-event health`
